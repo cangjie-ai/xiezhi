@@ -1,0 +1,1 @@
+optimum-cli export onnx --model ./best_intent_model --task text-classification ./onnx_model

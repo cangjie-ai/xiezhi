@@ -1,0 +1,103 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Cursor
+.cursor/
+
+# 机器学习模型文件（通常很大，不应提交到 git）
+*.pkl
+*.h5
+*.hdf5
+*.pb
+*.pth
+*.pt
+*.onnx
+*.safetensors
+*.bin
+*.ckpt
+
+# 训练结果和检查点
+results/
+checkpoints/
+runs/
+logs/
+outputs/
+wandb/
+
+# 模型目录（保留结构，但不提交模型文件）
+best_intent_model/
+onnx_model/
+saved_models/
+
+# Hugging Face 缓存
+.cache/
+cache/
+
+# 数据文件（如果数据很大或敏感）
+# data/*.csv
+# data/*.json
+# 注释上面的行如果您想提交数据文件
+
+# TensorBoard
+events.out.tfevents.*
+
+# 临时文件
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Windows
+*.lnk
+
+# 日志文件
+*.log
+
+# 环境变量文件
+.env
+.env.local
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Conda
+.conda/
+
