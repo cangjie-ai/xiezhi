@@ -53,6 +53,8 @@ wandb/
 best_intent_model/
 onnx_model/
 saved_models/
+final_lora_adapter/
+qwen_intent_finetuned/
 
 # Hugging Face 缓存
 .cache/

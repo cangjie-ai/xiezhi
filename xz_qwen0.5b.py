@@ -56,12 +56,12 @@ def run_qlora_finetune(dataset):
     # 模型ID
     model_id = "Qwen/Qwen1.5-0.5B-Chat"
     
-    # 招式: 4位量化配置 (BitsAndBytesConfig)
-    # 这是开启QLoRA的第一步：告诉模型以4位加载。
+    # 招式: 8位量化配置 (BitsAndBytesConfig)
+    # 8-bit 量化：相比 4-bit，显存占用更多但精度更高
     bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4", # 使用NF4类型进行量化，效果更好
-        bnb_4bit_compute_dtype=torch.bfloat16 # 在计算时，使用bfloat16以保持精度和速度
+        load_in_8bit=True,  # 使用 8-bit 量化
+        llm_int8_threshold=6.0,  # LLM.int8() 的阈值参数
+        # 注意：8-bit 不需要 4-bit 特定的参数
     )
     
     # 招式: 加载量化后的模型和分词器
