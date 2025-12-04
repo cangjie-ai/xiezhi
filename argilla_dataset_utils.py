@@ -1508,14 +1508,14 @@ class ArgillaDatasetManager:
         annotator_2: Dict[str, Any]
     ) -> str:
         """
-        格式化两位标注者的信息为Markdown表格
+        格式化两位标注者的信息为HTML表格
         
         Args:
             annotator_1: 标注者1数据 {username, label, cot, time}
             annotator_2: 标注者2数据 {username, label, cot, time}
             
         Returns:
-            格式化的Markdown表格
+            格式化的HTML表格
         """
         username_1 = annotator_1.get("username", "未知")
         username_2 = annotator_2.get("username", "未知")
@@ -1526,12 +1526,32 @@ class ArgillaDatasetManager:
         time_1 = annotator_1.get("time", "未知")
         time_2 = annotator_2.get("time", "未知")
         
-        table = f"""| | **{username_1}** | **{username_2}** |
-|:--|:--|:--|
-| **Label** | `{label_1}` | `{label_2}` |
-| **COT** | {cot_1} | {cot_2} |
-| **时间** | {time_1} | {time_2} |
-"""
+        table = f"""<table style="width:100%; border-collapse:collapse; margin:10px 0;">
+  <thead>
+    <tr style="background-color:#f5f5f5;">
+      <th style="border:1px solid #ddd; padding:10px; text-align:left; width:80px;"></th>
+      <th style="border:1px solid #ddd; padding:10px; text-align:center;"><strong>{username_1}</strong></th>
+      <th style="border:1px solid #ddd; padding:10px; text-align:center;"><strong>{username_2}</strong></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="border:1px solid #ddd; padding:10px;"><strong>Label</strong></td>
+      <td style="border:1px solid #ddd; padding:10px; text-align:center;"><code style="background:#e7f3ff; padding:2px 6px; border-radius:3px;">{label_1}</code></td>
+      <td style="border:1px solid #ddd; padding:10px; text-align:center;"><code style="background:#fff3e7; padding:2px 6px; border-radius:3px;">{label_2}</code></td>
+    </tr>
+    <tr style="background-color:#fafafa;">
+      <td style="border:1px solid #ddd; padding:10px;"><strong>COT</strong></td>
+      <td style="border:1px solid #ddd; padding:10px;">{cot_1}</td>
+      <td style="border:1px solid #ddd; padding:10px;">{cot_2}</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #ddd; padding:10px;"><strong>时间</strong></td>
+      <td style="border:1px solid #ddd; padding:10px; font-size:12px; color:#666;">{time_1}</td>
+      <td style="border:1px solid #ddd; padding:10px; font-size:12px; color:#666;">{time_2}</td>
+    </tr>
+  </tbody>
+</table>"""
         return table
     
     def create_or_update_conflict_dataset(
@@ -2131,7 +2151,7 @@ def detect_and_create_conflict_dataset(
     冲突数据集的结构:
     - 字段:
         - original_text: 原始文本
-        - annotation_comparison: 标注对比表格（表头为标注者姓名，行为Label/COT/时间）
+        - annotation_comparison: 标注对比HTML表格（表头为标注者姓名，行为Label/COT/时间）
         - conflict_info: 冲突信息（数据集名称、记录ID）
     - 元数据:
         - original_dataset: 原始数据集名称
