@@ -1,0 +1,26 @@
+# BERT意图分类模型训练依赖包
+# 使用方法: pip install -r requirements.txt
+
+# 深度学习框架
+torch>=2.0.0
+
+# Transformers和数据集
+transformers>=4.30.0
+datasets>=2.14.0
+
+# 数据处理
+pandas>=2.0.0
+numpy>=1.24.0
+
+# 机器学习工具
+scikit-learn>=1.3.0
+
+# 可视化
+tensorboard>=2.13.0
+
+# 可选：加速分词
+# tokenizers>=0.13.0
+
+# 可选：使用国内镜像源加速安装
+# 运行：pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+

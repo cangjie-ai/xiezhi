@@ -1,4 +1,9 @@
-# fine_tune.py
+# BERT二分类训练脚本（配合Energy-based OOD检测）
+# 相比原版xz_bert.py，此版本：
+# 1. 只训练两类：寿险相关(1) vs 拒识(0)
+# 2. 不需要第三类"other"
+# 3. 保存验证集用于后续Energy阈值校准
+
 import pandas as pd
 from datasets import Dataset
 from transformers import AutoTokenizer
@@ -9,36 +14,28 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, con
 from sklearn.model_selection import train_test_split
 
 # ============================================
-# 第1步：数据预处理 - 适配BERT
+# 第1步：数据预处理
 # ============================================
 print("=" * 50)
 print("开始加载和预处理数据...")
 print("=" * 50)
 
-# 加载CSV数据（假设文件有三列：system, human, answer）
+# 加载CSV数据
 df = pd.read_csv('data/intent_data_label.csv')
 
-# 显示原始数据格式
 print("\n原始数据示例：")
 print(df.head())
 print(f"\n数据集大小: {len(df)} 条")
 
 # 数据预处理：将System和Human组合成BERT的输入
-# BERT适合处理单句或句对，我们将System作为上下文，Human作为问题
 def prepare_text_for_bert(row):
-    """
-    将LLM训练数据格式转换为BERT输入格式
-    方式1: 拼接System和Human (推荐)
-    方式2: 只用Human (如果System信息不重要)
-    """
-    # 获取列名（可能是'system', 'System'等）
+    """将LLM训练数据格式转换为BERT输入格式"""
     system_col = [col for col in df.columns if 'system' in col.lower()][0]
     human_col = [col for col in df.columns if 'human' in col.lower()][0]
     
     system_text = str(row[system_col]) if pd.notna(row[system_col]) else ""
     human_text = str(row[human_col]) if pd.notna(row[human_col]) else ""
     
-    # 拼接方式：用[SEP]分隔符或直接拼接
     if system_text:
         return f"{system_text} {human_text}"
     else:
@@ -46,32 +43,25 @@ def prepare_text_for_bert(row):
 
 df['text'] = df.apply(prepare_text_for_bert, axis=1)
 
-# 提取标签：支持三分类以处理OOD问题
-# 你需要根据实际数据调整这个逻辑
+# 提取标签：二分类
 answer_col = [col for col in df.columns if 'answer' in col.lower() or '答案' in col][0]
 
 def extract_label(answer):
     """
-    从答案中提取标签（三分类）
-    0: 拒识（明确拒绝回答的非寿险问题，如"抱歉，我只能回答寿险问题"）
+    二分类标签提取：
+    0: 拒识（非寿险问题，包括车险、重疾、闲聊等所有非寿险内容）
     1: 寿险相关（关于寿险的专业问题）
-    2: other（OOD - 无法明确分类的其他问题）
     
     ⚠️ 请根据你的实际数据调整判断逻辑！
     """
     answer_str = str(answer).lower()
     
-    # 优先判断是否是寿险相关
+    # 判断是否是寿险相关
     if '寿险' in answer_str or 'life insurance' in answer_str or '定期寿' in answer_str or '终身寿' in answer_str:
         return 1
     
-    # 判断是否是明确的拒识回答
-    reject_keywords = ['抱歉', '只能回答寿险', '无法回答', '不能回答', '超出我的能力范围', '我不清楚']
-    if any(keyword in answer_str for keyword in reject_keywords):
-        return 0
-    
-    # 其他无法明确分类的情况，标记为other（处理OOD）
-    return 2
+    # 其他都是拒识（包括车险、重疾、闲聊、OOD等）
+    return 0
 
 df['label'] = df[answer_col].apply(extract_label)
 
@@ -80,6 +70,8 @@ print("\n处理后的数据示例：")
 print(df[['text', 'label']].head(10))
 print(f"\n标签分布：")
 print(df['label'].value_counts())
+print(f"  0 (拒识): {(df['label']==0).sum()} 条 ({(df['label']==0).sum()/len(df):.1%})")
+print(f"  1 (寿险): {(df['label']==1).sum()} 条 ({(df['label']==1).sum()/len(df):.1%})")
 
 # 只保留需要的列
 df_processed = df[['text', 'label']]
@@ -90,15 +82,15 @@ df_processed = df_processed[df_processed['text'].str.strip() != '']
 # ============================================
 # 第2步：数据集划分（训练集、验证集、测试集）
 # ============================================
-# 先划分出测试集（10%），然后训练集和验证集（90%）
+# 先划分出测试集（10%）
 train_val_df, test_df = train_test_split(
     df_processed, 
     test_size=0.1, 
     random_state=42, 
-    stratify=df_processed['label']  # 保持标签比例
+    stratify=df_processed['label']
 )
 
-# 再将训练集划分为训练集和验证集（验证集用于早停）
+# 再将训练集划分为训练集和验证集
 train_df, val_df = train_test_split(
     train_val_df, 
     test_size=0.15,  # 验证集占总数据的约13.5%
@@ -111,6 +103,10 @@ print(f"训练集: {len(train_df)} 条")
 print(f"验证集: {len(val_df)} 条")
 print(f"测试集: {len(test_df)} 条")
 
+# ⚠️ 重要：保存验证集，用于后续Energy阈值校准
+val_df.to_csv('validation_set.csv', index=False)
+print(f"\n✓ 验证集已保存至 validation_set.csv（用于Energy阈值校准）")
+
 # 转换为Hugging Face Dataset格式
 train_dataset = Dataset.from_pandas(train_df, preserve_index=False)
 val_dataset = Dataset.from_pandas(val_df, preserve_index=False)
@@ -119,7 +115,7 @@ test_dataset = Dataset.from_pandas(test_df, preserve_index=False)
 # ============================================
 # 第3步：模型和分词器初始化
 # ============================================
-# 选择中文BERT模型（可选其他中文模型）
+# 选择中文BERT模型
 checkpoint = "hfl/rbt3"  # 轻量级中文BERT
 # 其他选择: "bert-base-chinese", "hfl/chinese-roberta-wwm-ext"
 
@@ -128,17 +124,12 @@ tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
 # 定义分词函数
 def tokenize_function(examples):
-    """
-    BERT分词处理
-    - max_length: 根据实际文本长度调整（可以先统计下平均长度）
-    - truncation: 截断过长文本
-    - padding: 填充到统一长度
-    """
+    """BERT分词处理"""
     return tokenizer(
         examples["text"], 
         padding="max_length", 
         truncation=True, 
-        max_length=128  # 可以根据实际情况调整
+        max_length=128
     )
 
 # 对数据集进行分词处理
@@ -150,36 +141,33 @@ tokenized_test = test_dataset.map(tokenize_function, batched=True)
 print("分词完成！")
 
 # ============================================
-# 第4步：加载模型
+# 第4步：加载模型（二分类）
 # ============================================
 model = AutoModelForSequenceClassification.from_pretrained(
     checkpoint, 
-    num_labels=3,  # 三分类：0-拒识, 1-寿险相关, 2-other(OOD)
+    num_labels=2,  # 二分类：0-拒识, 1-寿险相关
     problem_type="single_label_classification"
 )
 
 # ============================================
-# 第5步：定义评估指标（更全面）
+# 第5步：定义评估指标
 # ============================================
 def compute_metrics(eval_pred):
-    """
-    计算多个评估指标：准确率、精确率、召回率、F1分数
-    对三分类使用macro平均（每个类别权重相同）
-    """
+    """计算评估指标：准确率、精确率、召回率、F1分数"""
     logits, labels = eval_pred
     predictions = np.argmax(logits, axis=-1)
     
     # 计算准确率
     accuracy = accuracy_score(labels, predictions)
     
-    # 计算精确率、召回率、F1（三分类使用macro平均）
+    # 计算精确率、召回率、F1（二分类使用binary）
     precision, recall, f1, _ = precision_recall_fscore_support(
-        labels, predictions, average='macro', zero_division=0
+        labels, predictions, average='binary', zero_division=0
     )
     
-    # 也计算weighted平均（考虑类别不平衡）
-    _, _, f1_weighted, _ = precision_recall_fscore_support(
-        labels, predictions, average='weighted', zero_division=0
+    # 也计算macro平均（两个类别权重相同）
+    _, _, f1_macro, _ = precision_recall_fscore_support(
+        labels, predictions, average='macro', zero_division=0
     )
     
     return {
@@ -187,14 +175,14 @@ def compute_metrics(eval_pred):
         "precision": precision,
         "recall": recall,
         "f1": f1,
-        "f1_weighted": f1_weighted,
+        "f1_macro": f1_macro,
     }
 
 # ============================================
-# 第6步：训练参数配置（包含早停）
+# 第6步：训练参数配置
 # ============================================
 training_args = TrainingArguments(
-    output_dir="./results",                    # 输出目录
+    output_dir="./results_binary",             # 输出目录
     num_train_epochs=50,                       # 最大训练轮次（早停会提前终止）
     per_device_train_batch_size=16,            # 训练批次大小
     per_device_eval_batch_size=16,             # 评估批次大小
@@ -219,8 +207,8 @@ training_args = TrainingArguments(
     greater_is_better=True,                    # F1越大越好
     
     # 日志目录和TensorBoard
-    logging_dir='./logs',
-    report_to="tensorboard",               # 启用TensorBoard日志
+    logging_dir='./logs_binary',
+    report_to="tensorboard",
     
     # 设置随机种子
     seed=42,
@@ -237,12 +225,12 @@ trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=tokenized_train,
-    eval_dataset=tokenized_val,              # 使用验证集进行评估和早停
+    eval_dataset=tokenized_val,
     compute_metrics=compute_metrics,
     callbacks=[
         EarlyStoppingCallback(
             early_stopping_patience=3,        # 如果3个epoch内F1没提升就停止
-            early_stopping_threshold=0.001    # 提升的最小阈值
+            early_stopping_threshold=0.001
         )
     ],
 )
@@ -251,7 +239,7 @@ trainer = Trainer(
 # 第8步：开始训练
 # ============================================
 print("\n" + "=" * 50)
-print("开始微调BERT模型...")
+print("开始微调BERT模型（二分类）...")
 print("=" * 50)
 trainer.train()
 
@@ -280,25 +268,43 @@ test_predictions = trainer.predict(tokenized_test)
 test_pred_labels = np.argmax(test_predictions.predictions, axis=-1)
 test_true_labels = test_predictions.label_ids
 
-# 打印混淆矩阵（3x3）
+# 打印混淆矩阵（2x2）
 print("\n混淆矩阵：")
-print("标签说明: 0-拒识, 1-寿险相关, 2-other(OOD)")
+print("标签说明: 0-拒识, 1-寿险相关")
 cm = confusion_matrix(test_true_labels, test_pred_labels)
-print("           预测0  预测1  预测2")
-print(f"实际0      {cm[0][0]:5d}  {cm[0][1]:5d}  {cm[0][2]:5d}  (拒识)")
-print(f"实际1      {cm[1][0]:5d}  {cm[1][1]:5d}  {cm[1][2]:5d}  (寿险)")
-print(f"实际2      {cm[2][0]:5d}  {cm[2][1]:5d}  {cm[2][2]:5d}  (other)")
+print("           预测0  预测1")
+print(f"实际0      {cm[0][0]:5d}  {cm[0][1]:5d}  (拒识)")
+print(f"实际1      {cm[1][0]:5d}  {cm[1][1]:5d}  (寿险)")
 
 # 计算每个类别的准确率
 print("\n各类别性能：")
-for i, label_name in enumerate(['拒识', '寿险相关', 'other(OOD)']):
+for i, label_name in enumerate(['拒识', '寿险相关']):
     if cm[i].sum() > 0:
         class_accuracy = cm[i][i] / cm[i].sum()
-        print(f"  {label_name}: {class_accuracy:.4f} (正确{cm[i][i]}/{cm[i].sum()}个)")
+        class_recall = cm[i][i] / cm[i].sum()
+        class_precision = cm[i][i] / cm[:, i].sum() if cm[:, i].sum() > 0 else 0
+        print(f"  {label_name}:")
+        print(f"    准确率: {class_accuracy:.4f} (正确{cm[i][i]}/{cm[i].sum()}个)")
+        print(f"    召回率: {class_recall:.4f}")
+        print(f"    精确率: {class_precision:.4f}")
 
 print("\n" + "=" * 50)
 print("训练完成！")
 print("=" * 50)
-print("\n💡 提示：可以使用以下命令查看训练过程可视化：")
-print("   tensorboard --logdir=./logs")
-print("   然后在浏览器打开 http://localhost:6006")
+
+print("\n下一步：")
+print("  1. 运行 Energy阈值校准:")
+print("     python xz_bert_calibrate_energy.py")
+print("\n  2. 或直接运行完整流程:")
+print("     python run_energy_calibration.py")
+print("\n  3. 查看训练过程可视化:")
+print("     tensorboard --logdir=./logs_binary")
+
+
+
+
+
+
+
+
+
