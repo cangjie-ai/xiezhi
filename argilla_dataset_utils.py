@@ -1424,9 +1424,8 @@ class ArgillaDatasetManager:
             # 定义字段
             fields = [
                 rg.TextField(name="original_text", title="原始文本", use_markdown=True),
-                rg.TextField(name="annotator_1_info", title="标注者1信息", use_markdown=True),
-                rg.TextField(name="annotator_2_info", title="标注者2信息", use_markdown=True),
-                rg.TextField(name="conflict_summary", title="冲突摘要", use_markdown=True),
+                rg.TextField(name="annotation_comparison", title="标注对比", use_markdown=True),
+                rg.TextField(name="conflict_info", title="冲突信息", use_markdown=True),
             ]
             
             # 定义问题 - 审核者选择正确的标签
@@ -1503,29 +1502,37 @@ class ArgillaDatasetManager:
         
         return existing_ids
     
-    def _format_annotator_info(self, annotator_data: Dict[str, Any], annotator_num: int) -> str:
+    def _format_annotation_comparison_table(
+        self, 
+        annotator_1: Dict[str, Any], 
+        annotator_2: Dict[str, Any]
+    ) -> str:
         """
-        格式化标注者信息为Markdown文本
+        格式化两位标注者的信息为Markdown表格
         
         Args:
-            annotator_data: 标注者数据 {username, label, cot, time}
-            annotator_num: 标注者编号 (1 或 2)
+            annotator_1: 标注者1数据 {username, label, cot, time}
+            annotator_2: 标注者2数据 {username, label, cot, time}
             
         Returns:
-            格式化的Markdown文本
+            格式化的Markdown表格
         """
-        username = annotator_data.get("username", "未知")
-        label = annotator_data.get("label", "无")
-        cot = annotator_data.get("cot", "无")
-        time = annotator_data.get("time", "未知")
+        username_1 = annotator_1.get("username", "未知")
+        username_2 = annotator_2.get("username", "未知")
+        label_1 = annotator_1.get("label", "无")
+        label_2 = annotator_2.get("label", "无")
+        cot_1 = annotator_1.get("cot") or "未填写"
+        cot_2 = annotator_2.get("cot") or "未填写"
+        time_1 = annotator_1.get("time", "未知")
+        time_2 = annotator_2.get("time", "未知")
         
-        info = f"""**标注者{annotator_num}: {username}**
-
-- **分类标签**: `{label}`
-- **标注理由(COT)**: {cot if cot else "未填写"}
-- **标注时间**: {time}
+        table = f"""| | **{username_1}** | **{username_2}** |
+|:--|:--|:--|
+| **Label** | `{label_1}` | `{label_2}` |
+| **COT** | {cot_1} | {cot_2} |
+| **时间** | {time_1} | {time_2} |
 """
-        return info
+        return table
     
     def create_or_update_conflict_dataset(
         self,
@@ -1673,29 +1680,23 @@ class ArgillaDatasetManager:
                             original_text = conflict["fields"][key]
                             break
                 
-                # 格式化标注者信息
-                annotator_1_info = self._format_annotator_info(conflict["annotator_1"], 1)
-                annotator_2_info = self._format_annotator_info(conflict["annotator_2"], 2)
+                # 格式化标注对比表格
+                annotation_comparison = self._format_annotation_comparison_table(
+                    conflict["annotator_1"], 
+                    conflict["annotator_2"]
+                )
                 
-                # 冲突摘要
-                conflict_summary = f"""**冲突详情**
-
-- **原始数据集**: {conflict["original_dataset"]}
-- **原始记录ID**: {original_record_id}
-- **冲突检测时间**: {conflict["conflict_detected_at"]}
-
-**标签冲突**:
-- 标注者1 ({conflict["annotator_1"]["username"]}): `{conflict["annotator_1"]["label"]}`
-- 标注者2 ({conflict["annotator_2"]["username"]}): `{conflict["annotator_2"]["label"]}`
+                # 冲突信息（简化版）
+                conflict_info = f"""**数据集**: {conflict["original_dataset"]}  
+**记录ID**: {original_record_id}
 """
                 
                 # 构建记录
                 record_data = {
                     "fields": {
                         "original_text": original_text,
-                        "annotator_1_info": annotator_1_info,
-                        "annotator_2_info": annotator_2_info,
-                        "conflict_summary": conflict_summary,
+                        "annotation_comparison": annotation_comparison,
+                        "conflict_info": conflict_info,
                     },
                     "metadata": {
                         "original_dataset": conflict["original_dataset"],
@@ -2130,9 +2131,8 @@ def detect_and_create_conflict_dataset(
     冲突数据集的结构:
     - 字段:
         - original_text: 原始文本
-        - annotator_1_info: 标注者1的信息（包含label, COT, 时间, 用户名）
-        - annotator_2_info: 标注者2的信息（包含label, COT, 时间, 用户名）
-        - conflict_summary: 冲突摘要
+        - annotation_comparison: 标注对比表格（表头为标注者姓名，行为Label/COT/时间）
+        - conflict_info: 冲突信息（数据集名称、记录ID）
     - 元数据:
         - original_dataset: 原始数据集名称
         - original_record_id: 原始记录ID
