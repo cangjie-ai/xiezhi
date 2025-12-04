@@ -1523,32 +1523,25 @@ class ArgillaDatasetManager:
         label_2 = annotator_2.get("label", "无")
         cot_1 = annotator_1.get("cot") or "未填写"
         cot_2 = annotator_2.get("cot") or "未填写"
-        time_1 = annotator_1.get("time", "未知")
-        time_2 = annotator_2.get("time", "未知")
         
         table = f"""<table style="width:100%; border-collapse:collapse; margin:10px 0;">
   <thead>
     <tr style="background-color:#f5f5f5;">
-      <th style="border:1px solid #ddd; padding:10px; text-align:left; width:80px;"></th>
-      <th style="border:1px solid #ddd; padding:10px; text-align:center;"><strong>{username_1}</strong></th>
-      <th style="border:1px solid #ddd; padding:10px; text-align:center;"><strong>{username_2}</strong></th>
+      <th style="border:1px solid #ddd; padding:10px; text-align:left; width:120px;"></th>
+      <th style="border:1px solid #ddd; padding:10px; text-align:center;"><strong>Label</strong></th>
+      <th style="border:1px solid #ddd; padding:10px; text-align:left;"><strong>COT</strong></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td style="border:1px solid #ddd; padding:10px;"><strong>Label</strong></td>
+      <td style="border:1px solid #ddd; padding:10px;"><strong>{username_1}</strong></td>
       <td style="border:1px solid #ddd; padding:10px; text-align:center;"><code style="background:#e7f3ff; padding:2px 6px; border-radius:3px;">{label_1}</code></td>
-      <td style="border:1px solid #ddd; padding:10px; text-align:center;"><code style="background:#fff3e7; padding:2px 6px; border-radius:3px;">{label_2}</code></td>
+      <td style="border:1px solid #ddd; padding:10px;">{cot_1}</td>
     </tr>
     <tr style="background-color:#fafafa;">
-      <td style="border:1px solid #ddd; padding:10px;"><strong>COT</strong></td>
-      <td style="border:1px solid #ddd; padding:10px;">{cot_1}</td>
+      <td style="border:1px solid #ddd; padding:10px;"><strong>{username_2}</strong></td>
+      <td style="border:1px solid #ddd; padding:10px; text-align:center;"><code style="background:#fff3e7; padding:2px 6px; border-radius:3px;">{label_2}</code></td>
       <td style="border:1px solid #ddd; padding:10px;">{cot_2}</td>
-    </tr>
-    <tr>
-      <td style="border:1px solid #ddd; padding:10px;"><strong>时间</strong></td>
-      <td style="border:1px solid #ddd; padding:10px; font-size:12px; color:#666;">{time_1}</td>
-      <td style="border:1px solid #ddd; padding:10px; font-size:12px; color:#666;">{time_2}</td>
     </tr>
   </tbody>
 </table>"""
